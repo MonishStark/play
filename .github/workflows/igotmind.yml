@@ -8,14 +8,13 @@ on:
     - cron: "30 3 * * 6" # Saturday 9:00 AM IST
 
 permissions:
-  contents: read # We don't need write anymore (no Pages)
+  contents: read
   id-token: write
 
 jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    # Run commands from ROOT to find node_modules, but point to config in folder
     defaults:
       run:
         working-directory: ./
@@ -33,10 +32,13 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
-      # 3. Run Tests (Point to the config inside the folder)
+      # 🔴 FIX: Enter folder first, THEN run tests.
+      # This forces the 'playwright-report' to be created INSIDE 'igotmind/'
       - name: Run Playwright Tests
         continue-on-error: true
-        run: npx playwright test --config=igotmind/playwright.config.js --update-snapshots
+        run: |
+          cd igotmind
+          npx playwright test --update-snapshots
         env:
           TEST_EMAIL: ${{ secrets.IGOTMIND_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.IGOTMIND_TEST_PASSWORD }}
@@ -48,7 +50,7 @@ jobs:
           node -e "
             try {
               const fs = require('fs');
-              // Check for results.json inside the folder
+              // Now this path will be correct
               if (fs.existsSync('./igotmind/results.json')) {
                 const r = require('./igotmind/results.json');
                 const passed = r.stats.expected + r.stats.flaky;
@@ -65,16 +67,16 @@ jobs:
             }
           " >> $GITHUB_ENV
 
-      # 🔴 NEW STEP: Upload the Report as a Zip Artifact
+      # 5. Upload Report Artifact
       - name: Upload Report Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: igotmind/playwright-report/
+          path: igotmind/playwright-report/ # This will now match!
           retention-days: 30
 
-      # 🔴 UPDATED EMAIL: Links to the Artifact Page
+      # 6. Send Email
       - name: Send Email Notification
         if: always()
         uses: dawidd6/action-send-mail@v3
