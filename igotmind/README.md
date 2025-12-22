@@ -55,17 +55,17 @@ Tests are split into two independent specifications to allow **concurrent execut
 ### B. Authenticated Journey (Dashboard)
 
 - `/my-courses/` (Dashboard)
-- My Courses
-- My Grades
-- My Memberships
-- Private Area
-- Achievements
-- Certificates
-- My Notes
-- Notifications
-- Edit Account
-- Redeem Voucher
-- Order History
+- `/my-courses/my-courses/` - My Courses
+- `/my-courses/my-grades/` - My Grades
+- `/my-courses/my-memberships/` - My Memberships
+- `/my-courses/my-private-area/` - Private Area
+- `/my-courses/my-achievements/` - Achievements
+- `/my-courses/my-certificates/` - Certificates
+- `/my-courses/my-notes/` - My Notes
+- `/my-courses/notifications/` - Notifications
+- `/my-courses/edit-account/` - Edit Account
+- `/my-courses/redeem-voucher/` - Redeem Voucher
+- `/my-courses/orders/` - Order History
 
 ---
 
