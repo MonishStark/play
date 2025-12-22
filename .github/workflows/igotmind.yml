@@ -32,25 +32,34 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
-      # 🔴 FIX: Enter folder first, THEN run tests.
-      # This forces the 'playwright-report' to be created INSIDE 'igotmind/'
+      # 1. Run Tests (From Root -> Generates 'playwright-report' in Root)
       - name: Run Playwright Tests
         continue-on-error: true
-        run: |
-          cd igotmind
-          npx playwright test --update-snapshots
+        # We explicitly output the JSON result to the correct folder,
+        # but the HTML report defaults to the root.
+        run: npx playwright test --config=igotmind/playwright.config.js --update-snapshots --reporter=html,json:igotmind/results.json
         env:
           TEST_EMAIL: ${{ secrets.IGOTMIND_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.IGOTMIND_TEST_PASSWORD }}
 
-      # 4. Calculate Stats
+      # 2. 🔴 FIX: Move the Report into the Folder
+      - name: Move Report to Site Folder
+        if: always()
+        run: |
+          # If the report exists in root, move it to igotmind/
+          if [ -d "playwright-report" ]; then
+            rm -rf igotmind/playwright-report
+            mv playwright-report igotmind/
+          fi
+
+      # 3. Calculate Stats
       - name: Calculate Test Stats
         if: always()
         run: |
           node -e "
             try {
               const fs = require('fs');
-              // Now this path will be correct
+              // Now looking for results.json in the folder (set by CLI flag above)
               if (fs.existsSync('./igotmind/results.json')) {
                 const r = require('./igotmind/results.json');
                 const passed = r.stats.expected + r.stats.flaky;
@@ -67,16 +76,16 @@ jobs:
             }
           " >> $GITHUB_ENV
 
-      # 5. Upload Report Artifact
+      # 4. Upload Report Artifact
       - name: Upload Report Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: igotmind/playwright-report/ # This will now match!
+          path: igotmind/playwright-report/ # Now it will be found here!
           retention-days: 30
 
-      # 6. Send Email
+      # 5. Send Email
       - name: Send Email Notification
         if: always()
         uses: dawidd6/action-send-mail@v3
