@@ -120,5 +120,5 @@ jobs:
             🔗 LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             (Scheduled Run: Saturdays @ 9am IST)
-          to: gsatoru0373@gmail.com
+          to: gsatoru0373@gmail.com, ripul.chhabra@sowlab.com
           from: "QA Automation Bot"
