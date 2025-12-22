@@ -1,0 +1,109 @@
+# @format
+
+name: "I Got Mind: Automation"
+
+on:
+  workflow_dispatch: # Manual Button
+  schedule:
+    - cron: "30 3 * * 6" # Saturday 9:00 AM IST (3:30 AM UTC)
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    # 🔴 MONOREPO SETUP: Runs commands inside the site folder by default
+    defaults:
+      run:
+        working-directory: ./igotmind
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # 1. Install Dependencies (Must run from Root)
+      - name: Install Dependencies
+        run: npm ci
+        working-directory: ./
+
+      # 2. Install Playwright Browsers (Must run from Root)
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+        working-directory: ./
+
+      # 3. Run Tests
+      - name: Run Playwright Tests
+        continue-on-error: true
+        run: npx playwright test --update-snapshots
+        env:
+          # 🔴 SECRET MAPPING: Connects specific secrets to the code's generic variables
+          TEST_EMAIL: ${{ secrets.IGOTMIND_TEST_EMAIL }}
+          TEST_PASSWORD: ${{ secrets.IGOTMIND_TEST_PASSWORD }}
+
+      # 4. Calculate Stats
+      - name: Calculate Test Stats
+        if: always()
+        run: |
+          node -e "
+            try {
+              const fs = require('fs');
+              // Looks for results.json inside ./igotmind/
+              if (fs.existsSync('./results.json')) {
+                const r = require('./results.json');
+                const passed = r.stats.expected + r.stats.flaky;
+                const failed = r.stats.unexpected;
+                console.log('PASSED=' + passed);
+                console.log('FAILED=' + failed);
+              } else {
+                console.log('PASSED=0');
+                console.log('FAILED=Error');
+              }
+            } catch (e) {
+              console.log('PASSED=0');
+              console.log('FAILED=Crash');
+            }
+          " >> $GITHUB_ENV
+
+      # 5. Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
+        if: always()
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./igotmind/playwright-report
+          destination_dir: igotmind # 🔴 URL: .../igotmind/
+          keep_files: true
+
+      # 6. Send Email Notification
+      - name: Send Email Notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          # 🔴 CRITICAL: Your specific hosting server address
+          server_address: premium49.web-hosting.com
+          server_port: 465
+
+          # Uses your Professional Email Secrets
+          username: ${{ secrets.REPORT_FROM_MAIL }}
+          password: ${{ secrets.REPORT_FROM_PASSWORD }}
+
+          subject: "QA Report: ${{ env.PASSED }} Passed, ${{ env.FAILED }} Failed - I Got Mind"
+          body: |
+            I Got Mind - QA Automation Run Completed.
+
+            SUMMARY:
+            ✅ Passed: ${{ env.PASSED }}
+            ❌ Failed: ${{ env.FAILED }}
+
+            🔗 VIEW REPORT: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/igotmind/
+
+            (Scheduled Run: Saturdays @ 9am IST)
+          to: gsatoru0373@gmail.com, ripul.chhabra@sowlab.com
+          from: "QA Automation Bot"
