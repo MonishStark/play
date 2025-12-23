@@ -108,5 +108,5 @@ jobs:
             3. Click "naturally-beautiful-report" to download the ZIP file.
 
             🔗 LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          to: gsatoru0373@gmail.com
+          to: gsatoru0373@gmail.com, ripul.chhabra@sowlab.com
           from: "QA Automation Bot"
