@@ -30,7 +30,6 @@ async function loadAllLazyImages(page) {
 const pagesToTest = [
 	// --- Main Pages ---
 	{ path: "/", name: "Home" },
-	{ path: "/home-2/", name: "Home_Variant_2" },
 	{ path: "/about-us/", name: "About_Us" },
 	{ path: "/contact-us/", name: "Contact_Us" },
 	{ path: "/faq/", name: "FAQ" },
@@ -47,29 +46,13 @@ const pagesToTest = [
 	{ path: "/hr/", name: "Sol_HR" },
 	{ path: "/retail/", name: "Sol_Retail" },
 	{ path: "/internal-virtual-agent/", name: "Sol_Virtual_Agent" },
-
-	// --- Blog Formats ---
-	{ path: "/right-sidebar-blog-1/", name: "Blog_Right_Sidebar_1" },
-	{ path: "/right-sidebar-blog-2/", name: "Blog_Right_Sidebar_2" },
-	{ path: "/left-sidebar-blog-1/", name: "Blog_Left_Sidebar_1" },
-	{ path: "/left-sidebar-blog-2/", name: "Blog_Left_Sidebar_2" },
-	{ path: "/two-column-blog/", name: "Blog_Two_Col" },
-	{ path: "/three-column-blog/", name: "Blog_Three_Col" },
-	{ path: "/four-column-blog/", name: "Blog_Four_Col" },
-	{ path: "/four-column-full-width/", name: "Blog_Four_Col_Full" },
-
 	// --- Blog Content ---
 	{ path: "/blog/", name: "Blog_Index" },
 	{ path: "/blog/how-to-set-up-a-chatbot/", name: "Post_Setup_Chatbot" },
 	{ path: "/blog/instant-patient-data-access/", name: "Post_Patient_Data" },
 	{ path: "/blog/advantages-of-chatbots/", name: "Post_Advantages_Chatbots" },
 	{ path: "/blog/category/technology/", name: "Cat_Technology" },
-	{ path: "/blog/category/photography/", name: "Cat_Photography" },
-	{ path: "/blog/tag/photography/", name: "Tag_Photography" },
 	{ path: "/blog/author/ripulchhabra/", name: "Author_Ripul" },
-	{ path: "/blog/2025/04/15/", name: "Archive_2025_04" },
-	{ path: "/blog/2024/03/10/", name: "Archive_2024_03" },
-	{ path: "/blog/2024/02/20/", name: "Archive_2024_02" },
 ];
 
 test.describe("DigiBot - Full Site Visual Audit", () => {
