@@ -2,17 +2,24 @@
 
 const { test, expect } = require("@playwright/test");
 
+// 1. HELPER: SUPER SLOW SCROLLER (Forces lazy product images to load)
 async function loadAllLazyImages(page) {
+	// A. Wait for fonts (Icons/prices)
+	await page.evaluate(() => document.fonts.ready);
+
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-		for (let i = 0; i < document.body.scrollHeight; i += 300) {
+		// B. Scroll down SLOWLY (100px steps)
+		const totalHeight = document.body.scrollHeight;
+		for (let i = 0; i < totalHeight; i += 100) {
 			window.scrollTo(0, i);
-			await delay(30);
+			await delay(100); // Wait longer for images to fade in
 		}
 		window.scrollTo(0, 0);
 	});
-	await page.waitForTimeout(2000);
+
+	await page.waitForTimeout(3000);
 }
 
 const pagesToTest = [
@@ -78,13 +85,15 @@ test.describe("Naturally Beautiful - Full Site Audit", () => {
 	for (const pageInfo of pagesToTest) {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
 			await page.goto(pageInfo.path);
-			await page.waitForLoadState("domcontentloaded");
 
+			// 2. Wait for Network Idle (Ensures images are downloaded)
+			await page.waitForLoadState("networkidle");
+
+			// 3. Slow Scroll
 			await loadAllLazyImages(page);
 
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
-				animations: "disabled",
 				timeout: 60000,
 				maxDiffPixelRatio: 0.02,
 			});
