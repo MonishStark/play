@@ -1,4 +1,5 @@
 /** @format */
+
 const { defineConfig, devices } = require("@playwright/test");
 
 module.exports = defineConfig({
@@ -14,7 +15,6 @@ module.exports = defineConfig({
 		baseURL: "https://www.inventor.market",
 		trace: "on-first-retry",
 		screenshot: "on",
-		// 🔴 NEW: Pretend to be a real user to bypass Cloudflare
 		userAgent:
 			"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 		viewport: { width: 1280, height: 720 },
@@ -23,7 +23,6 @@ module.exports = defineConfig({
 		permissions: ["geolocation"],
 		ignoreHTTPSErrors: true,
 
-		// Add headers that real browsers send
 		extraHTTPHeaders: {
 			Accept:
 				"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",

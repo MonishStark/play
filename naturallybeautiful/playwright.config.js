@@ -1,4 +1,5 @@
 /** @format */
+
 const { defineConfig, devices } = require("@playwright/test");
 
 module.exports = defineConfig({
@@ -8,10 +9,9 @@ module.exports = defineConfig({
 	retries: 0,
 	workers: process.env.CI ? 2 : undefined,
 	reporter: [["html"], ["json", { outputFile: "results.json" }]],
-	timeout: 3600000, // 1 Hour Max
+	timeout: 3600000,
 
 	use: {
-		// 🔴 TARGET URL
 		baseURL: "https://naturallybeautifulhaircare.com",
 		trace: "on-first-retry",
 		screenshot: "on",
