@@ -26,7 +26,7 @@ async function loadAllLazyImages(page) {
 	await page.waitForTimeout(3000);
 }
 
-// 2. COMPLETE URL LIST
+// 2. COMPLETE URL LIST (35 Pages)
 const pagesToTest = [
 	// --- Main Pages ---
 	{ path: "/", name: "Home" },
@@ -36,7 +36,7 @@ const pagesToTest = [
 	{ path: "/faq/", name: "FAQ" },
 	{ path: "/pricing-plan/", name: "Pricing_Plan" },
 	{ path: "/service/", name: "Service" },
-	{ path: "/terms-of-use/", name: "Terms_Use" },
+	{ path: "/terms-of-use/", name: "Terms_of_Use" },
 	{ path: "/privacy-policy/", name: "Privacy_Policy" },
 
 	// --- Industries / Solutions ---
@@ -60,12 +60,16 @@ const pagesToTest = [
 
 	// --- Blog Content ---
 	{ path: "/blog/", name: "Blog_Index" },
-	{ path: "/blog/category/technology/", name: "Blog_Cat_Tech" },
 	{ path: "/blog/how-to-set-up-a-chatbot/", name: "Post_Setup_Chatbot" },
 	{ path: "/blog/instant-patient-data-access/", name: "Post_Patient_Data" },
-	{ path: "/blog/artificial-inteligence-applied/", name: "Post_AI_Applied" },
-	{ path: "/blog/advantages-of-chatbots/", name: "Post_Chatbot_Advantages" },
-	{ path: "/blog/what-are-chatbots/", name: "Post_What_Are_Chatbots" },
+	{ path: "/blog/advantages-of-chatbots/", name: "Post_Advantages_Chatbots" },
+	{ path: "/blog/category/technology/", name: "Cat_Technology" },
+	{ path: "/blog/category/photography/", name: "Cat_Photography" },
+	{ path: "/blog/tag/photography/", name: "Tag_Photography" },
+	{ path: "/blog/author/ripulchhabra/", name: "Author_Ripul" },
+	{ path: "/blog/2025/04/15/", name: "Archive_2025_04" },
+	{ path: "/blog/2024/03/10/", name: "Archive_2024_03" },
+	{ path: "/blog/2024/02/20/", name: "Archive_2024_02" },
 ];
 
 test.describe("DigiBot - Full Site Visual Audit", () => {
