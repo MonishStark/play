@@ -2,24 +2,24 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: SUPER SLOW SCROLLER (Forces lazy product images to load)
+// 1. HELPER: Slow/Safe Scroller (Prevents Bot Blocking & Loads Images)
 async function loadAllLazyImages(page) {
-	// A. Wait for fonts (Icons/prices)
+	// Wait for fonts/icons
 	await page.evaluate(() => document.fonts.ready);
 
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-		// B. Scroll down SLOWLY (100px steps)
 		const totalHeight = document.body.scrollHeight;
+
+		// Slower scroll (100px) acts more human-like
 		for (let i = 0; i < totalHeight; i += 100) {
 			window.scrollTo(0, i);
-			await delay(100); // Wait longer for images to fade in
+			await delay(100);
 		}
 		window.scrollTo(0, 0);
 	});
 
-	await page.waitForTimeout(3000);
+	await page.waitForTimeout(2000);
 }
 
 const pagesToTest = [
@@ -28,6 +28,7 @@ const pagesToTest = [
 	{ path: "/shop/", name: "Shop_Main" },
 	{ path: "/contact-us/", name: "Contact_Us" },
 
+	// Categories
 	{ path: "/product-category/essential-oils/", name: "Cat_Essential_Oils" },
 	{ path: "/product-category/hair-care/", name: "Cat_Hair_Care" },
 	{ path: "/product-category/hair-growth/", name: "Cat_Hair_Growth" },
@@ -37,6 +38,7 @@ const pagesToTest = [
 	{ path: "/product-category/beauty/", name: "Cat_Beauty" },
 	{ path: "/product-category/self-care/", name: "Cat_Self_Care" },
 
+	// Products
 	{
 		path: "/product/scalp-stimulating-hair-growth-formula/",
 		name: "Product_Scalp_Formula",
@@ -52,10 +54,10 @@ const pagesToTest = [
 	},
 	{ path: "/product/sweet-treat-pamper-kit/", name: "Product_Sweet_Treat" },
 
+	// Portfolio
 	{ path: "/portfolio-category/coloring/", name: "Port_Cat_Coloring" },
 	{ path: "/portfolio-category/haistyle/", name: "Port_Cat_Hairstyle" },
 	{ path: "/portfolio-category/hair-products/", name: "Port_Cat_Products" },
-
 	{ path: "/portfolio-item/layers/", name: "Gallery_Layers" },
 	{ path: "/portfolio-item/volume/", name: "Gallery_Volume" },
 	{ path: "/portfolio-item/confident/", name: "Gallery_Confident" },
@@ -72,6 +74,7 @@ const pagesToTest = [
 	{ path: "/portfolio-item/waves/", name: "Gallery_Waves" },
 	{ path: "/portfolio-item/colors/", name: "Gallery_Colors_Item" },
 
+	// Tags
 	{ path: "/portfolio-tag/blonde/", name: "Tag_Blonde" },
 	{ path: "/portfolio-tag/gloss/", name: "Tag_Gloss" },
 	{ path: "/portfolio-tag/haircut/", name: "Tag_Haircut" },
@@ -86,10 +89,10 @@ test.describe("Naturally Beautiful - Full Site Audit", () => {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
 			await page.goto(pageInfo.path);
 
-			// 2. Wait for Network Idle (Ensures images are downloaded)
+			// 🔴 USE THIS: Wait for network idle (more reliable)
 			await page.waitForLoadState("networkidle");
 
-			// 3. Slow Scroll
+			// 🔴 USE THIS: Slower scroll
 			await loadAllLazyImages(page);
 
 			await expect(page).toHaveScreenshot({

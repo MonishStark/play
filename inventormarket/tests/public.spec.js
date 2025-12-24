@@ -3,6 +3,7 @@
 const { test, expect } = require("@playwright/test");
 
 async function performHumanChecks(page) {
+	// 1. Cloudflare Bypass: Random Mouse Movements
 	for (let i = 0; i < 5; i++) {
 		const x = 100 + Math.random() * 500;
 		const y = 100 + Math.random() * 500;
@@ -10,15 +11,19 @@ async function performHumanChecks(page) {
 		await page.waitForTimeout(200);
 	}
 
+	// 2. Image Loading: Slow Scroll
+	// Changed step from 400 -> 100 to ensure every image triggers
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-		for (let i = 0; i < document.body.scrollHeight; i += 400) {
+		const totalHeight = document.body.scrollHeight;
+		for (let i = 0; i < totalHeight; i += 100) {
 			window.scrollTo(0, i);
-			await delay(100 + Math.random() * 100);
+			await delay(100); // Consistent delay
 		}
 		window.scrollTo(0, 0);
 	});
 
+	// 3. Wait for Cloudflare to clear
 	await page.waitForTimeout(3000);
 }
 
@@ -36,6 +41,7 @@ const pagesToTest = [
 	{ path: "/category/medical/", name: "Cat_Medical" },
 	{ path: "/category/footwear/", name: "Cat_Footwear" },
 	{ path: "/category/measuring/", name: "Cat_Measuring" },
+	{ path: "/explore/", name: "Explore_Page" },
 ];
 
 test.describe("Inventor Market - Visual Audit", () => {
@@ -43,15 +49,18 @@ test.describe("Inventor Market - Visual Audit", () => {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
 			await page.goto(pageInfo.path);
 
+			// 1. Run Human/Scroll Checks
 			await performHumanChecks(page);
 
+			// 2. Double check if stuck on Cloudflare
 			const title = await page.title();
 			if (title.includes("Just a moment") || title.includes("Security")) {
 				console.log("⚠️ Still stuck on Challenge page, waiting 5s more...");
 				await page.waitForTimeout(5000);
 			}
 
-			await page.waitForLoadState("domcontentloaded");
+			// 🔴 CRITICAL CHANGE: networkidle ensures images are downloaded
+			await page.waitForLoadState("networkidle");
 
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
