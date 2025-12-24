@@ -2,23 +2,31 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Robust Scroller to load all lazy images & animations
+// 1. HELPER: SUPER SLOW SCROLLER (Forces animations to finish)
 async function loadAllLazyImages(page) {
+	// A. Wait for fonts to be ready (Critical for icons)
+	await page.evaluate(() => document.fonts.ready);
+
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-		// Slower scroll to ensure lazy-loading triggers
-		for (let i = 0; i < document.body.scrollHeight; i += 300) {
+
+		// B. Scroll down SLOWLY (100px steps) to trigger "fade-in" animations
+		const totalHeight = document.body.scrollHeight;
+		for (let i = 0; i < totalHeight; i += 100) {
+			// Smaller steps
 			window.scrollTo(0, i);
-			await delay(50);
+			await delay(100); // Longer wait (gives time for opacity: 0 -> 1)
 		}
-		// Scroll back to top to ensure sticky headers settle
+
+		// C. Scroll back to top
 		window.scrollTo(0, 0);
 	});
-	// Extra wait for any final layout shifts
-	await page.waitForTimeout(2000);
+
+	// D. Final wait to ensure the top-of-page animations settle
+	await page.waitForTimeout(3000);
 }
 
-// 2. COMPLETE URL LIST (31 Pages)
+// 2. COMPLETE URL LIST
 const pagesToTest = [
 	// --- Main Pages ---
 	{ path: "/", name: "Home" },
@@ -66,19 +74,19 @@ test.describe("DigiBot - Full Site Visual Audit", () => {
 			// 1. Navigate
 			await page.goto(pageInfo.path);
 
-			// 🔴 FIX: Wait for Network Idle (Images/Fonts fully loaded)
-			// This solves the "testing before page loads" issue
+			// 2. Wait for Network Idle (Images downloaded)
 			await page.waitForLoadState("networkidle");
 
-			// 2. STABILIZE: Scroll to load lazy elements
+			// 3. RUN SLOW SCROLL (Forces animations to appear)
 			await loadAllLazyImages(page);
 
-			// 3. SCREENSHOT
+			// 4. SCREENSHOT
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
-				animations: "disabled",
+				// 🔴 IMPORTANT: Removed 'animations: disabled'
+				// We WANT the animations to be visible in their final state.
 				timeout: 60000,
-				maxDiffPixelRatio: 0.05, // 5% tolerance for minor rendering shifts
+				maxDiffPixelRatio: 0.05,
 			});
 		});
 	}
