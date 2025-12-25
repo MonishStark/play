@@ -2,32 +2,24 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. CONFIG: Stealth User Agent (Backup to the Config fix)
+// 1. CONFIG: Basic User Agent (Good practice, even with mocking)
 test.use({
 	userAgent:
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	locale: "en-US",
-	permissions: ["geolocation"],
 	bypassCSP: true,
 	ignoreHTTPSErrors: true,
 });
 
-// 2. HELPER: Safe Scroll + CSS Layout Fix
+// 2. HELPER: Safe Scroll + Visual Mocking
 async function performSafeScroll(page) {
-	// A. STEALTH INJECTION: Delete "Robot" property (Double safety)
-	await page.addInitScript(() => {
-		Object.defineProperty(navigator, "webdriver", {
-			get: () => undefined,
-		});
-	});
-
-	// B. PRE-EMPTIVE CSS: Force Layout Space & Visibility
+	// A. PRE-EMPTIVE CSS: Clean up the page
 	await page.addStyleTag({
 		content: `
-      /* 1. Kill Cookie Bar */
+      /* Kill Cookie Bar */
       #moove_gdpr_cookie_info_bar { display: none !important; }
 
-      /* 2. Force Elementor Content Visible */
+      /* Force Elementor Content Visible */
       .elementor-invisible,
       .elementor-motion-effects-element,
       .elementor-motion-effects-parent,
@@ -38,35 +30,13 @@ async function performSafeScroll(page) {
         animation: none !important;
         transition: none !important;
       }
-
-      /* 3. Force Iframes Visible */
-      iframe {
-        opacity: 1 !important;
-        visibility: visible !important;
-      }
-
-      /* 4. CALENDLY FIXES (Layout Only) */
-      .calendly-spinner { display: none !important; } /* Hide stuck spinner */
       
-      /* Force widget to take up space immediately */
-      .calendly-inline-widget, 
-      iframe[src*="calendly"] {
-        min-height: 1000px !important; 
-        height: 1000px !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        display: block !important;
-        background-color: transparent !important;
-      }
-      
-      /* 5. Catch-all for opacity 0 */
-      [style*="opacity: 0"] {
-        opacity: 1 !important;
-      }
+      /* Hide the real spinner since we are mocking */
+      .calendly-spinner { display: none !important; }
     `,
 	});
 
-	// C. WAKE UP VIDEOS (Eager Load)
+	// B. WAKE UP VIDEOS (Eager Load)
 	await page.evaluate(() => {
 		document.querySelectorAll("iframe").forEach((frame) => {
 			frame.loading = "eager";
@@ -74,7 +44,7 @@ async function performSafeScroll(page) {
 		});
 	});
 
-	// D. SCROLL LOGIC
+	// C. SCROLL LOGIC
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
@@ -86,9 +56,43 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// E. Final Buffer: Just Wait (Config fix allows natural load)
-	console.log("⏳ Waiting 10s for widgets to render...");
-	await page.waitForTimeout(10000);
+	// D. 🚀 THE VISUAL MOCK (Fixes White Box Permanently)
+	// We replace the blocked Calendly iframe with a stable "Mock Widget"
+	await page.evaluate(() => {
+		const frames = document.querySelectorAll('iframe[src*="calendly"]');
+
+		frames.forEach((frame) => {
+			// Create a fake widget that matches the size
+			const mock = document.createElement("div");
+			mock.style.width = "100%";
+			mock.style.height = "1030px"; // Matches your live site height
+			mock.style.backgroundColor = "#ffffff";
+			mock.style.display = "flex";
+			mock.style.flexDirection = "column";
+			mock.style.alignItems = "center";
+			mock.style.justifyContent = "center";
+			mock.style.border = "1px solid #e0e0e0";
+			mock.style.borderRadius = "8px";
+			mock.style.boxShadow = "0 4px 12px rgba(0,0,0,0.05)";
+
+			// Add content so it looks like a calendar
+			mock.innerHTML = `
+        <div style="font-size: 64px; margin-bottom: 20px;">📅</div>
+        <h2 style="font-family: sans-serif; color: #333; margin: 0 0 10px 0;">Booking Calendar</h2>
+        <p style="font-family: sans-serif; color: #666;">(Mocked for Visual Stability)</p>
+        <button style="background: #0069ff; color: white; padding: 12px 24px; border: none; border-radius: 40px; font-size: 16px; margin-top: 20px;">Select a Date</button>
+      `;
+
+			// Swap the blocked iframe with our nice mock
+			if (frame.parentNode) {
+				frame.parentNode.replaceChild(mock, frame);
+			}
+		});
+	});
+
+	// E. Final Buffer
+	console.log("⏳ Layout stable. Taking screenshot...");
+	await page.waitForTimeout(3000);
 }
 
 // 3. PUBLIC URL LIST
@@ -114,7 +118,7 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run Safe Scroll
+			// Run Safe Scroll with Mocking
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
