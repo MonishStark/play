@@ -9,12 +9,20 @@ module.exports = defineConfig({
 	retries: 0,
 	workers: process.env.CI ? 2 : undefined,
 	reporter: [["html"], ["json", { outputFile: "results.json" }]],
-	timeout: 3600000,
+	timeout: 3600000, // Keeps your long timeout
 
 	use: {
 		baseURL: "https://igotmind.ca",
 		trace: "on-first-retry",
 		screenshot: "on",
+
+		/* 🚀 NEW: ANTI-BOT LAUNCH ARGS (Fixes Calendly White Box) */
+		launchOptions: {
+			// This flag hides the "I am a robot" signal from Calendly
+			args: ["--disable-blink-features=AutomationControlled"],
+			// This hides the "Chrome is controlled by automated software" bar
+			ignoreDefaultArgs: ["--enable-automation"],
+		},
 	},
 
 	expect: {
