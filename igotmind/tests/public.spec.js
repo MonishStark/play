@@ -2,18 +2,27 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HUMAN DISGUISE: Trick Calendly into thinking we are a real Desktop Chrome browser
-// This bypasses the "Headless" security block that causes the white iframe.
+// 1. CONFIG: Use a real browser signature
 test.use({
 	userAgent:
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	locale: "en-US",
 	permissions: ["geolocation"],
+	bypassCSP: true, // Bypass Content Security Policies that might block frames
+	ignoreHTTPSErrors: true,
 });
 
-// 2. HELPER: Safe Scroll + Widget Fix + Spinner Killer
+// 2. HELPER: Safe Scroll + Stealth Mode + Widget Fix
 async function performSafeScroll(page) {
-	// A. PRE-EMPTIVE CSS: Force Layout & Hide Spinner
+	// A. STEALTH INJECTION: Delete the "I am a Robot" flag
+	// This runs inside the browser and hides the automation signal.
+	await page.addInitScript(() => {
+		Object.defineProperty(navigator, "webdriver", {
+			get: () => undefined,
+		});
+	});
+
+	// B. PRE-EMPTIVE CSS: Force Layout & Hide Spinner
 	await page.addStyleTag({
 		content: `
       /* 1. Kill Cookie Bar */
@@ -38,18 +47,17 @@ async function performSafeScroll(page) {
       }
 
       /* 4. CALENDLY FIXES */
-      /* Kill the spinner so it doesn't block the view */
       .calendly-spinner { display: none !important; }
       
-      /* Force widget size */
+      /* Force widget size & background */
       .calendly-inline-widget, 
       iframe[src*="calendly"] {
-        min-height: 900px !important; 
-        height: 900px !important;
+        min-height: 1000px !important; 
+        height: 1000px !important;
         opacity: 1 !important;
         visibility: visible !important;
         display: block !important;
-        background-color: transparent !important; /* Prevent white overlay */
+        background-color: transparent !important;
       }
       
       /* 5. Catch-all for opacity 0 */
@@ -59,7 +67,7 @@ async function performSafeScroll(page) {
     `,
 	});
 
-	// B. WAKE UP VIDEOS
+	// C. WAKE UP VIDEOS
 	await page.evaluate(() => {
 		document.querySelectorAll("iframe").forEach((frame) => {
 			frame.loading = "eager";
@@ -67,7 +75,7 @@ async function performSafeScroll(page) {
 		});
 	});
 
-	// C. SCROLL LOGIC
+	// D. SCROLL LOGIC
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
@@ -79,19 +87,19 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// D. THE KICKSTART: Force Calendly to Reload
+	// E. THE KICKSTART: Force Calendly Refresh
 	console.log("⚡ Kickstarting Calendly Widget...");
 
 	await page.evaluate(() => {
 		const widgets = document.querySelectorAll('iframe[src*="calendly"]');
 		widgets.forEach((iframe) => {
-			// 1. Force a clean src refresh
+			// Refresh src to retry connection with new Stealth settings
 			const currentSrc = iframe.src;
 			iframe.src = currentSrc;
 		});
 	});
 
-	// E. Final Buffer: Extended wait for the "Real Browser" to load the iframe
+	// F. Final Buffer: Wait for the re-load
 	console.log("⏳ Waiting 10s for external widgets...");
 	await page.waitForTimeout(10000);
 }
@@ -119,7 +127,7 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run Safe Scroll with Human Disguise
+			// Run Safe Scroll with Stealth Mode
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
