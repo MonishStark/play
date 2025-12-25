@@ -32,9 +32,7 @@ jobs:
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps
 
-      # 1. Run Tests (SIMPLIFIED COMMAND)
-      # We removed the complex '--reporter' flag that caused the crash.
-      # This will generate 'playwright-report' and 'results.json' in the ROOT folder.
+      # 1. Run Tests (Passing Secrets)
       - name: Run Playwright Tests
         continue-on-error: true
         run: npx playwright test --config=igotmind/playwright.config.js --update-snapshots
@@ -42,34 +40,26 @@ jobs:
           TEST_EMAIL: ${{ secrets.IGOTMIND_TEST_EMAIL }}
           TEST_PASSWORD: ${{ secrets.IGOTMIND_TEST_PASSWORD }}
 
-      # 2. 🔴 CRITICAL FIX: Move the files into the folder manually
+      # 2. Move Reports
       - name: Move Reports to Site Folder
         if: always()
         run: |
-          # 1. Create folder if missing
           mkdir -p igotmind
-
-          # 2. Move the HTML Report Folder
           if [ -d "playwright-report" ]; then
             rm -rf igotmind/playwright-report
             mv playwright-report igotmind/
-            echo "✅ Moved HTML Report"
           fi
-
-          # 3. Move the JSON Results File
           if [ -f "results.json" ]; then
             mv results.json igotmind/
-            echo "✅ Moved JSON Results"
           fi
 
-      # 3. Calculate Stats (Now looks inside igotmind/)
+      # 3. Calculate Stats
       - name: Calculate Test Stats
         if: always()
         run: |
           node -e "
             try {
               const fs = require('fs');
-              // We just moved it here, so this will work now!
               if (fs.existsSync('./igotmind/results.json')) {
                 const r = require('./igotmind/results.json');
                 const passed = r.stats.expected + r.stats.flaky;
@@ -91,8 +81,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: igotmind/playwright-report/ # Correct path after move
+          name: igotmind-report
+          path: igotmind/playwright-report/
           retention-days: 30
 
       # 5. Send Email
@@ -115,10 +105,9 @@ jobs:
             📂 DOWNLOAD FULL REPORT:
             1. Click the link below.
             2. Scroll down to the "Artifacts" section.
-            3. Click "playwright-report" to download the ZIP file.
+            3. Click "igotmind-report" to download the ZIP file.
 
             🔗 LINK: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            (Scheduled Run: Saturdays @ 9am IST)
-          to: gsatoru0373@gmail.com, ripul.chhabra@sowlab.com
+          to: ${{ secrets.REPORT_TO_MAILS }}
           from: "QA Automation Bot"

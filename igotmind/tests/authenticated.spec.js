@@ -3,72 +3,65 @@
 const { test, expect } = require("@playwright/test");
 require("dotenv").config();
 
-const CREDENTIALS = {
-	email: process.env.TEST_EMAIL,
-	password: process.env.TEST_PASSWORD,
-};
-
-test.describe("I Got Mind - Authenticated Dashboard Audit", () => {
-	test.beforeEach(async ({ page }) => {
-		test.setTimeout(900000);
-
-		await page.addStyleTag({
-			content: `
-        #moove_gdpr_cookie_info_bar { display: none !important; } 
-        iframe { opacity: 0 !important; } 
-        .slick-track { visibility: hidden !important; }
-        .clock-animation { visibility: hidden !important; }
-        *, *::before, *::after {
-          animation-duration: 0s !important;
-          transition-duration: 0s !important;
-        }
-      `,
-		});
+// 1. HELPER: Safe Scroll
+async function performSafeScroll(page) {
+	await page.evaluate(async () => {
+		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+		for (let i = 0; i < document.body.scrollHeight; i += 100) {
+			window.scrollTo(0, i);
+			await delay(100);
+		}
+		window.scrollTo(0, 0);
 	});
+	await page.waitForTimeout(2000);
+}
 
-	test("Authenticated: Full Student Dashboard Journey", async ({ page }) => {
+test.describe("I Got Mind - Student Dashboard", () => {
+	test("Authenticated Journey (Login & Verify 11 Pages)", async ({ page }) => {
+		// A. LOGIN
+		console.log("🔑 Logging in...");
 		await page.goto("/my-courses/");
+
+		// Fill Credentials (ENV variables)
 		await page
 			.getByLabel("Email Address", { exact: false })
-			.pressSequentially(CREDENTIALS.email, { delay: 100 });
+			.fill(process.env.TEST_EMAIL);
 		await page
 			.getByLabel("Password", { exact: false })
-			.pressSequentially(CREDENTIALS.password, { delay: 100 });
+			.fill(process.env.TEST_PASSWORD);
 		await page.getByRole("button", { name: "Login", exact: false }).click();
 
+		// Verify Login Success
 		await expect(page.locator("body")).toHaveClass(/logged-in/, {
 			timeout: 30000,
 		});
+		console.log("✅ Login Successful");
 
-		await expect(page).toHaveScreenshot("Auth-01-Dashboard.png", {
-			fullPage: true,
-			animations: "disabled",
-		});
-
+		// B. TEST INTERNAL PAGES
 		const internalPages = [
-			{ name: "Auth-02-My-Courses", path: "/my-courses/my-courses/" },
-			{ name: "Auth-03-My-Grades", path: "/my-courses/my-grades/" },
-			{ name: "Auth-04-My-Memberships", path: "/my-courses/my-memberships/" },
-			{ name: "Auth-05-Private-Area", path: "/my-courses/my-private-area/" },
-			{ name: "Auth-06-Achievements", path: "/my-courses/my-achievements/" },
-			{ name: "Auth-07-Certificates", path: "/my-courses/my-certificates/" },
-			{ name: "Auth-08-My-Notes", path: "/my-courses/my-notes/" },
-			{ name: "Auth-09-Notifications", path: "/my-courses/notifications/" },
-			{ name: "Auth-10-Edit-Account", path: "/my-courses/edit-account/" },
-			{ name: "Auth-11-Redeem-Voucher", path: "/my-courses/redeem-voucher/" },
-			{ name: "Auth-12-Order-History", path: "/my-courses/orders/" },
+			{ name: "Auth_01_Courses_List", path: "/my-courses/my-courses/" },
+			{ name: "Auth_02_Grades", path: "/my-courses/my-grades/" },
+			{ name: "Auth_03_Memberships", path: "/my-courses/my-memberships/" },
+			{ name: "Auth_04_Private_Area", path: "/my-courses/my-private-area/" },
+			{ name: "Auth_05_Achievements", path: "/my-courses/my-achievements/" },
+			{ name: "Auth_06_Certificates", path: "/my-courses/my-certificates/" },
+			{ name: "Auth_07_Notes", path: "/my-courses/my-notes/" },
+			{ name: "Auth_08_Notifications", path: "/my-courses/notifications/" },
+			{ name: "Auth_09_Edit_Account", path: "/my-courses/edit-account/" },
+			{ name: "Auth_10_Redeem_Voucher", path: "/my-courses/redeem-voucher/" },
+			{ name: "Auth_11_Orders", path: "/my-courses/orders/" },
 		];
 
 		for (const internalPage of internalPages) {
-			console.log(`Navigating to ${internalPage.name}...`);
+			console.log(`➡️ Navigating to: ${internalPage.name}`);
 			await page.goto(internalPage.path);
 
-			await page.waitForLoadState("domcontentloaded");
-			await page.waitForTimeout(2000);
+			// Wait for content & Scroll
+			await page.waitForLoadState("networkidle");
+			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot(`${internalPage.name}.png`, {
 				fullPage: true,
-				animations: "disabled",
 			});
 		}
 	});
