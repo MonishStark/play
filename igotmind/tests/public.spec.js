@@ -2,24 +2,37 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Safe Scroll (Triggers animations naturally)
+// 1. HELPER: Safe Scroll & Video Loader
 async function performSafeScroll(page) {
-	// Hide Cookie Bar only (Do not kill animations)
+	// A. Hide Cookie Bar only
 	await page.addStyleTag({
 		content: "#moove_gdpr_cookie_info_bar { display: none !important; }",
 	});
 
-	// Scroll logic
+	// B. Scroll logic (Triggers lazy loading animations)
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
+
+		// 100ms delay allows "fade-in" animations to trigger
 		for (let i = 0; i < totalHeight; i += 100) {
 			window.scrollTo(0, i);
 			await delay(100);
 		}
 		window.scrollTo(0, 0);
 	});
-	await page.waitForTimeout(2000);
+
+	// C. CRITICAL: Wait for "load" event (For Video Thumbnails)
+	// We use a try/catch so if it takes >10s, it doesn't kill the test.
+	try {
+		console.log("⏳ Waiting for video thumbnails to load...");
+		await page.waitForLoadState("load", { timeout: 10000 });
+	} catch (e) {
+		console.log("⚠️ Page load took too long (10s), proceeding to screenshot.");
+	}
+
+	// D. Final Buffer: Give the video player 5s to render the image
+	await page.waitForTimeout(5000);
 }
 
 // 2. PUBLIC URL LIST (12 Pages)
@@ -43,9 +56,10 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 		test(`Verify: ${pageInfo.name}`, async ({ page }) => {
 			await page.goto(pageInfo.path);
 
-			// Wait for network to settle (Images/Animations)
+			// Fast initial wait for text/layout
 			await page.waitForLoadState("domcontentloaded");
 
+			// Run Safe Scroll (Handles videos & animations)
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
