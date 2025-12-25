@@ -2,105 +2,66 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. CONFIG: Stealth User Agent
+// Global test settings
 test.use({
 	userAgent:
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	locale: "en-US",
 	permissions: ["geolocation"],
-	bypassCSP: true,
-	ignoreHTTPSErrors: true,
 });
 
-// 2. HELPER: Safe Scroll + Fonts + PayPal Fix
-async function performSafeScroll(page) {
-	// A.1 STEALTH INJECTION
+// ---------- Helper: Stable Scroll & Load ----------
+async function preparePageForScreenshot(page) {
+	// Flag Playwright mode (useful if site wants to mock widgets later)
 	await page.addInitScript(() => {
-		Object.defineProperty(navigator, "webdriver", {
-			get: () => undefined,
-		});
+		window.__PLAYWRIGHT__ = true;
 	});
 
-	// A.2 WAIT FOR FONTS
-	console.log("🎨 Waiting for custom fonts...");
+	// Wait for fonts
 	await page.evaluate(async () => {
 		await document.fonts.ready;
 	});
 
-	// B. PRE-EMPTIVE CSS: Force Layout (Calendly + PayPal)
+	// Disable animations & lazy effects (Elementor-safe)
 	await page.addStyleTag({
 		content: `
-      /* 1. Kill Cookie Bar */
-      #moove_gdpr_cookie_info_bar { display: none !important; }
-
-      /* 2. Force Elementor Content Visible */
-      .elementor-invisible,
-      .elementor-motion-effects-element,
-      .elementor-motion-effects-parent,
-      .elementor-widget-container {
-        opacity: 1 !important;
-        visibility: visible !important;
-        transform: none !important;
+      * {
         animation: none !important;
         transition: none !important;
       }
 
-      /* 3. Force Iframes Visible */
-      iframe {
+      .elementor-invisible,
+      .elementor-motion-effects-element,
+      .elementor-motion-effects-parent {
         opacity: 1 !important;
         visibility: visible !important;
+        transform: none !important;
       }
 
-      /* 4. CALENDLY FIXES */
-      .calendly-spinner { display: none !important; }
-      .calendly-inline-widget, 
-      iframe[src*="calendly"] {
-        min-height: 1000px !important; 
-        height: 1000px !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-        display: block !important;
-        background-color: transparent !important;
-      }
-
-      /* 5. PAYPAL WIDGET FIX (New) */
-      /* Targets the class from your code snippet */
-      div[class*="styles-module_campaigns_widget"],
-      div[class*="campaigns_widget"] {
-        opacity: 1 !important;
-        visibility: visible !important;
-        display: block !important;
-        min-height: 500px !important; /* Forces the card to have height */
+      #moove_gdpr_cookie_info_bar {
+        display: none !important;
       }
     `,
 	});
 
-	// C. WAKE UP VIDEOS
-	await page.evaluate(() => {
-		document.querySelectorAll("iframe").forEach((frame) => {
-			frame.loading = "eager";
-			frame.style.opacity = "1";
-		});
-	});
-
-	// D. SCROLL LOGIC
+	// Slow scroll to trigger lazy loads
 	await page.evaluate(async () => {
-		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-		const totalHeight = document.body.scrollHeight;
+		const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+		const height = document.body.scrollHeight;
 
-		for (let i = 0; i < totalHeight; i += 200) {
-			window.scrollTo(0, i);
-			await delay(100);
+		for (let y = 0; y < height; y += 250) {
+			window.scrollTo(0, y);
+			await delay(80);
 		}
+
 		window.scrollTo(0, 0);
 	});
 
-	// E. Final Buffer: Wait for Widgets (PayPal + Calendly)
-	console.log("⏳ Waiting 15s for external widgets...");
-	await page.waitForTimeout(15000);
+	// Final settle buffer
+	await page.waitForTimeout(3000);
 }
 
-// 3. PUBLIC URL LIST
+// ---------- Pages ----------
 const pagesToTest = [
 	{ path: "/", name: "01_Home" },
 	{ path: "/about/", name: "02_About_Us" },
@@ -116,17 +77,24 @@ const pagesToTest = [
 	{ path: "/purchase/", name: "12_Purchase_Flow" },
 ];
 
-test.describe("I Got Mind - Public Visual Audit", () => {
+// ---------- Tests ----------
+test.describe("I Got Mind – Public Visual Audit", () => {
 	for (const pageInfo of pagesToTest) {
-		test(`Verify: ${pageInfo.name}`, async ({ page }) => {
-			await page.goto(pageInfo.path);
+		test(`Visual: ${pageInfo.name}`, async ({ page }) => {
+			await page.goto(pageInfo.path, { waitUntil: "domcontentloaded" });
 
-			await page.waitForLoadState("domcontentloaded");
+			await preparePageForScreenshot(page);
 
-			// Run Safe Scroll
-			await performSafeScroll(page);
+			await expect(page).toHaveScreenshot({
+				fullPage: true,
 
-			await expect(page).toHaveScreenshot({ fullPage: true });
+				// ✅ MASK THIRD-PARTY WIDGETS (THE FIX)
+				mask: [
+					page.locator('iframe[src*="paypal"]'),
+					page.locator('iframe[src*="calendly"]'),
+					page.locator('div[class*="campaigns_widget"]'),
+				],
+			});
 		});
 	}
 });
