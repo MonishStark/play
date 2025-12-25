@@ -2,7 +2,7 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. CONFIG: Stealth User Agent (Backup to the Config fix)
+// 1. CONFIG: Stealth User Agent
 test.use({
 	userAgent:
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -12,16 +12,22 @@ test.use({
 	ignoreHTTPSErrors: true,
 });
 
-// 2. HELPER: Safe Scroll + CSS Layout Fix
+// 2. HELPER: Safe Scroll + Fonts + PayPal Fix
 async function performSafeScroll(page) {
-	// A. STEALTH INJECTION: Delete "Robot" property (Double safety)
+	// A.1 STEALTH INJECTION
 	await page.addInitScript(() => {
 		Object.defineProperty(navigator, "webdriver", {
 			get: () => undefined,
 		});
 	});
 
-	// B. PRE-EMPTIVE CSS: Force Layout Space & Visibility
+	// A.2 WAIT FOR FONTS
+	console.log("🎨 Waiting for custom fonts...");
+	await page.evaluate(async () => {
+		await document.fonts.ready;
+	});
+
+	// B. PRE-EMPTIVE CSS: Force Layout (Calendly + PayPal)
 	await page.addStyleTag({
 		content: `
       /* 1. Kill Cookie Bar */
@@ -45,10 +51,8 @@ async function performSafeScroll(page) {
         visibility: visible !important;
       }
 
-      /* 4. CALENDLY FIXES (Layout Only) */
-      .calendly-spinner { display: none !important; } /* Hide stuck spinner */
-      
-      /* Force widget to take up space immediately */
+      /* 4. CALENDLY FIXES */
+      .calendly-spinner { display: none !important; }
       .calendly-inline-widget, 
       iframe[src*="calendly"] {
         min-height: 1000px !important; 
@@ -58,15 +62,20 @@ async function performSafeScroll(page) {
         display: block !important;
         background-color: transparent !important;
       }
-      
-      /* 5. Catch-all for opacity 0 */
-      [style*="opacity: 0"] {
+
+      /* 5. PAYPAL WIDGET FIX (New) */
+      /* Targets the class from your code snippet */
+      div[class*="styles-module_campaigns_widget"],
+      div[class*="campaigns_widget"] {
         opacity: 1 !important;
+        visibility: visible !important;
+        display: block !important;
+        min-height: 500px !important; /* Forces the card to have height */
       }
     `,
 	});
 
-	// C. WAKE UP VIDEOS (Eager Load)
+	// C. WAKE UP VIDEOS
 	await page.evaluate(() => {
 		document.querySelectorAll("iframe").forEach((frame) => {
 			frame.loading = "eager";
@@ -86,9 +95,9 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// E. Final Buffer: Just Wait (Config fix allows natural load)
-	console.log("⏳ Waiting 10s for widgets to render...");
-	await page.waitForTimeout(10000);
+	// E. Final Buffer: Wait for Widgets (PayPal + Calendly)
+	console.log("⏳ Waiting 15s for external widgets...");
+	await page.waitForTimeout(15000);
 }
 
 // 3. PUBLIC URL LIST
