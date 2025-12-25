@@ -2,19 +2,55 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Safe Scroll + Elementor Motion Fix (Fixes Hidden Sections & Black Videos)
+// 1. HELPER: Safe Scroll + Nuclear CSS Injection
 async function performSafeScroll(page) {
-	// A. Hide Cookie Bar
+	// A. PRE-EMPTIVE CSS: Force everything to stay visible using !important
+	// This prevents Elementor from hiding elements before we even start scrolling.
 	await page.addStyleTag({
-		content: "#moove_gdpr_cookie_info_bar { display: none !important; }",
+		content: `
+      /* 1. Kill Cookie Bar */
+      #moove_gdpr_cookie_info_bar { display: none !important; }
+
+      /* 2. Force Elementor Content Visible */
+      .elementor-invisible,
+      .elementor-motion-effects-element,
+      .elementor-motion-effects-parent,
+      .elementor-motion-effects-layer,
+      .elementor-widget-container {
+        opacity: 1 !important;
+        visibility: visible !important;
+        transform: none !important;
+        animation: none !important;
+        transition: none !important;
+      }
+
+      /* 3. Force Iframes/Videos Visible */
+      iframe {
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+
+      /* 4. Catch-all for any hidden opacity */
+      [style*="opacity: 0"] {
+        opacity: 1 !important;
+      }
+    `,
 	});
 
-	// B. Scroll logic (Triggers standard lazy loading)
+	// B. WAKE UP VIDEOS (JS Injection)
+	await page.evaluate(() => {
+		document.querySelectorAll("iframe").forEach((frame) => {
+			frame.loading = "eager";
+			frame.style.opacity = "1";
+		});
+	});
+
+	// C. SCROLL LOGIC (Triggers lazy loading images)
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// Scroll down in chunks to trigger basic events
+		// Scroll down in chunks
 		for (let i = 0; i < totalHeight; i += 200) {
 			window.scrollTo(0, i);
 			await delay(100);
@@ -23,49 +59,21 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// C. TARGETED ELEMENTOR FIX (The "Anti-Motion" Script)
-	// This disables the math that keeps elements hidden while scrolling
+	// D. FINAL CLEANUP (The "Double Tap")
+	// If anything is still hidden after scrolling, we force it open again.
 	await page.evaluate(() => {
-		// 1. Force Iframes (Videos) to load immediately
-		document.querySelectorAll("iframe").forEach((frame) => {
-			frame.loading = "eager";
-			frame.style.opacity = "1";
-		});
-
-		// 2. KILL ELEMENTOR MOTION EFFECTS
-		// Targeted specifically at the class from your HTML inspection
 		const motionElements = document.querySelectorAll(
-			".elementor-motion-effects-element, .elementor-motion-effects-parent"
+			".elementor-motion-effects-element, .elementor-motion-effects-parent, .elementor-invisible"
 		);
-
 		motionElements.forEach((el) => {
-			// Forcefully override Elementor's inline opacity math
 			el.style.setProperty("opacity", "1", "important");
 			el.style.setProperty("transform", "none", "important");
-			el.style.setProperty("transition", "none", "important");
-
-			// Remove the class so Elementor stops trying to calculate it
-			el.classList.remove("elementor-motion-effects-element");
-		});
-
-		// 3. Universal Backup (For anything else hidden)
-		document.querySelectorAll("*").forEach((el) => {
-			const style = window.getComputedStyle(el);
-			// If it's invisible or transparent, force it to show
-			if (style.opacity === "0" || style.visibility === "hidden") {
-				el.style.setProperty("opacity", "1", "important");
-				el.style.setProperty("visibility", "visible", "important");
-			}
-
-			// Clean up common hiding classes
-			if (el.classList.contains("elementor-invisible")) {
-				el.classList.remove("elementor-invisible");
-			}
+			el.classList.remove("elementor-invisible");
 		});
 	});
 
-	// D. Final Buffer: 5 Seconds for the "forced" layout to settle
-	console.log("⏳ Waiting 5s for forced layout to settle...");
+	// E. Final Buffer: 5 Seconds for layout to settle
+	console.log("⏳ Waiting 5s for final layout...");
 	await page.waitForTimeout(5000);
 }
 
@@ -90,10 +98,10 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 		test(`Verify: ${pageInfo.name}`, async ({ page }) => {
 			await page.goto(pageInfo.path);
 
-			// Fast initial wait for text/layout
+			// Wait for basic structure
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run Safe Scroll with Elementor Motion Fix
+			// Run the robust scroll & fix script
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
