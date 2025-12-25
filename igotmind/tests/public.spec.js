@@ -2,36 +2,59 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Safe Scroll & Video Loader
+// 1. HELPER: Safe Scroll + Force Reveal (Fixes Missing Sections & Black Videos)
 async function performSafeScroll(page) {
-	// A. Hide Cookie Bar only
+	// A. Hide Cookie Bar
 	await page.addStyleTag({
 		content: "#moove_gdpr_cookie_info_bar { display: none !important; }",
 	});
 
-	// B. Scroll logic (Triggers lazy loading animations)
+	// B. Scroll logic to trigger standard lazy loading
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// 100ms delay allows "fade-in" animations to trigger
-		for (let i = 0; i < totalHeight; i += 100) {
+		// Scroll down in chunks
+		for (let i = 0; i < totalHeight; i += 200) {
 			window.scrollTo(0, i);
 			await delay(100);
 		}
+		// Scroll back to top
 		window.scrollTo(0, 0);
 	});
 
-	// C. CRITICAL: Wait for "load" event (For Video Thumbnails)
-	// We use a try/catch so if it takes >10s, it doesn't kill the test.
-	try {
-		console.log("⏳ Waiting for video thumbnails to load...");
-		await page.waitForLoadState("load", { timeout: 10000 });
-	} catch (e) {
-		console.log("⚠️ Page load took too long (10s), proceeding to screenshot.");
-	}
+	// C. FORCE REVEAL: The "Nuclear Option" for missing content
+	// This finds ANY element hidden by animation (Elementor, AOS, etc.) and forces it to show.
+	await page.evaluate(() => {
+		// 1. Force Iframes (Videos) to load
+		document.querySelectorAll("iframe").forEach((frame) => {
+			frame.loading = "eager";
+			frame.style.opacity = "1";
+		});
 
-	// D. Final Buffer: Give the video player 5s to render the image
+		// 2. Force "Fade In" elements to show immediately
+		// Checks for common animation libraries (Elementor, AOS, WOW.js)
+		const hiddenSelectors = [
+			".elementor-invisible",
+			"[data-aos]",
+			".wow",
+			".animated",
+			'[style*="opacity: 0"]',
+		];
+
+		hiddenSelectors.forEach((selector) => {
+			document.querySelectorAll(selector).forEach((el) => {
+				el.classList.remove("elementor-invisible"); // Remove hiding class
+				el.style.opacity = "1"; // Force opaque
+				el.style.visibility = "visible"; // Force visible
+				el.style.animation = "none"; // Stop moving
+				el.style.transition = "none"; // Stop fading
+			});
+		});
+	});
+
+	// D. Final Buffer: 5 Seconds for the "forced" layout to settle and videos to paint
+	console.log("⏳ Waiting 5s for forced layout to settle...");
 	await page.waitForTimeout(5000);
 }
 
@@ -59,7 +82,7 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 			// Fast initial wait for text/layout
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run Safe Scroll (Handles videos & animations)
+			// Run Safe Scroll with Force Reveal
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
