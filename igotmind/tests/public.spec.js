@@ -2,10 +2,9 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Safe Scroll + Nuclear CSS Injection
+// 1. HELPER: Safe Scroll + Nuclear CSS + Widget Fix
 async function performSafeScroll(page) {
-	// A. PRE-EMPTIVE CSS: Force everything to stay visible using !important
-	// This prevents Elementor from hiding elements before we even start scrolling.
+	// A. PRE-EMPTIVE CSS: Force visibility AND Height for Widgets
 	await page.addStyleTag({
 		content: `
       /* 1. Kill Cookie Bar */
@@ -15,7 +14,6 @@ async function performSafeScroll(page) {
       .elementor-invisible,
       .elementor-motion-effects-element,
       .elementor-motion-effects-parent,
-      .elementor-motion-effects-layer,
       .elementor-widget-container {
         opacity: 1 !important;
         visibility: visible !important;
@@ -30,40 +28,48 @@ async function performSafeScroll(page) {
         visibility: visible !important;
       }
 
-      /* 4. Catch-all for any hidden opacity */
+      /* 4. CALENDLY & WIDGET FIX (New) */
+      /* Forces the booking widget to expand immediately */
+      .calendly-inline-widget, 
+      iframe[src*="calendly"] {
+        min-height: 700px !important;
+        height: 700px !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+      }
+      
+      /* 5. Catch-all for opacity 0 */
       [style*="opacity: 0"] {
         opacity: 1 !important;
       }
     `,
 	});
 
-	// B. WAKE UP VIDEOS (JS Injection)
+	// B. WAKE UP VIDEOS & WIDGETS
 	await page.evaluate(() => {
+		// Force all iframes to load eagerly
 		document.querySelectorAll("iframe").forEach((frame) => {
 			frame.loading = "eager";
 			frame.style.opacity = "1";
 		});
 	});
 
-	// C. SCROLL LOGIC (Triggers lazy loading images)
+	// C. SCROLL LOGIC
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// Scroll down in chunks
 		for (let i = 0; i < totalHeight; i += 200) {
 			window.scrollTo(0, i);
 			await delay(100);
 		}
-		// Scroll back to top
 		window.scrollTo(0, 0);
 	});
 
-	// D. FINAL CLEANUP (The "Double Tap")
-	// If anything is still hidden after scrolling, we force it open again.
+	// D. FINAL CLEANUP (Double Check)
 	await page.evaluate(() => {
 		const motionElements = document.querySelectorAll(
-			".elementor-motion-effects-element, .elementor-motion-effects-parent, .elementor-invisible"
+			".elementor-motion-effects-element, .elementor-invisible"
 		);
 		motionElements.forEach((el) => {
 			el.style.setProperty("opacity", "1", "important");
@@ -72,7 +78,7 @@ async function performSafeScroll(page) {
 		});
 	});
 
-	// E. Final Buffer: 5 Seconds for layout to settle
+	// E. Final Buffer: 5 Seconds for widget content to render in the new space
 	console.log("⏳ Waiting 5s for final layout...");
 	await page.waitForTimeout(5000);
 }
@@ -98,10 +104,9 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 		test(`Verify: ${pageInfo.name}`, async ({ page }) => {
 			await page.goto(pageInfo.path);
 
-			// Wait for basic structure
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run the robust scroll & fix script
+			// Run Safe Scroll with Widget Fix
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
