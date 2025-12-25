@@ -57,7 +57,7 @@ test.describe("I Got Mind - Student Dashboard", () => {
 			await page.goto(internalPage.path);
 
 			// Wait for content & Scroll
-			await page.waitForLoadState("networkidle");
+			await page.waitForLoadState("domcontentloaded");
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot(`${internalPage.name}.png`, {

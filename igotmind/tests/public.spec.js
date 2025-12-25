@@ -44,7 +44,7 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 			await page.goto(pageInfo.path);
 
 			// Wait for network to settle (Images/Animations)
-			await page.waitForLoadState("networkidle");
+			await page.waitForLoadState("domcontentloaded");
 
 			await performSafeScroll(page);
 
