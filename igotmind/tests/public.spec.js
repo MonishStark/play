@@ -2,19 +2,19 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Safe Scroll + Universal Visibility (Fixes Missing Sections & Black Videos)
+// 1. HELPER: Safe Scroll + Elementor Motion Fix (Fixes Hidden Sections & Black Videos)
 async function performSafeScroll(page) {
 	// A. Hide Cookie Bar
 	await page.addStyleTag({
 		content: "#moove_gdpr_cookie_info_bar { display: none !important; }",
 	});
 
-	// B. Scroll logic (Trigger standard lazy loading)
+	// B. Scroll logic (Triggers standard lazy loading)
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// Scroll down in chunks
+		// Scroll down in chunks to trigger basic events
 		for (let i = 0; i < totalHeight; i += 200) {
 			window.scrollTo(0, i);
 			await delay(100);
@@ -23,35 +23,48 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// C. UNIVERSAL VISIBILITY FIX (The "Sledgehammer")
-	// Instead of guessing class names, we force ALL hidden content to appear.
+	// C. TARGETED ELEMENTOR FIX (The "Anti-Motion" Script)
+	// This disables the math that keeps elements hidden while scrolling
 	await page.evaluate(() => {
-		// 1. Force Iframes (Videos) to load
+		// 1. Force Iframes (Videos) to load immediately
 		document.querySelectorAll("iframe").forEach((frame) => {
 			frame.loading = "eager";
 			frame.style.opacity = "1";
 		});
 
-		// 2. Find ANY element with opacity 0 and force it to 1
-		const allElements = document.querySelectorAll("*");
-		allElements.forEach((el) => {
+		// 2. KILL ELEMENTOR MOTION EFFECTS
+		// Targeted specifically at the class from your HTML inspection
+		const motionElements = document.querySelectorAll(
+			".elementor-motion-effects-element, .elementor-motion-effects-parent"
+		);
+
+		motionElements.forEach((el) => {
+			// Forcefully override Elementor's inline opacity math
+			el.style.setProperty("opacity", "1", "important");
+			el.style.setProperty("transform", "none", "important");
+			el.style.setProperty("transition", "none", "important");
+
+			// Remove the class so Elementor stops trying to calculate it
+			el.classList.remove("elementor-motion-effects-element");
+		});
+
+		// 3. Universal Backup (For anything else hidden)
+		document.querySelectorAll("*").forEach((el) => {
 			const style = window.getComputedStyle(el);
-			// Check if element is effectively hidden
+			// If it's invisible or transparent, force it to show
 			if (style.opacity === "0" || style.visibility === "hidden") {
-				el.style.opacity = "1";
-				el.style.visibility = "visible";
-				el.style.animation = "none"; // Stop moving
-				el.style.transition = "none"; // Stop fading
+				el.style.setProperty("opacity", "1", "important");
+				el.style.setProperty("visibility", "visible", "important");
 			}
 
-			// Also remove common hiding classes just in case
+			// Clean up common hiding classes
 			if (el.classList.contains("elementor-invisible")) {
 				el.classList.remove("elementor-invisible");
 			}
 		});
 	});
 
-	// D. Final Buffer: 5 Seconds for the forced content to paint
+	// D. Final Buffer: 5 Seconds for the "forced" layout to settle
 	console.log("⏳ Waiting 5s for forced layout to settle...");
 	await page.waitForTimeout(5000);
 }
@@ -80,7 +93,7 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 			// Fast initial wait for text/layout
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run Safe Scroll with Universal Visibility Fix
+			// Run Safe Scroll with Elementor Motion Fix
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
