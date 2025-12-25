@@ -7,30 +7,22 @@ module.exports = defineConfig({
 	fullyParallel: true,
 	forbidOnly: !!process.env.CI,
 	retries: 0,
-	workers: process.env.CI ? 1 : undefined, // Lower workers for headed mode safety
+	workers: process.env.CI ? 2 : undefined,
 	reporter: [["html"], ["json", { outputFile: "results.json" }]],
-	timeout: 3600000,
+	timeout: 3600000, // Keeps your long timeout
 
 	use: {
 		baseURL: "https://igotmind.ca",
 		trace: "on-first-retry",
 		screenshot: "on",
 
-		// 🚀 CRITICAL CHANGE: Run with a Visible Browser (Headed)
-		// This bypasses strict "Anti-Bot" checks that block invisible browsers.
-		headless: false,
-
-		/* Anti-Bot Launch Args (Keep these for extra safety) */
+		/* 🚀 NEW: ANTI-BOT LAUNCH ARGS (Fixes Calendly White Box) */
 		launchOptions: {
-			args: [
-				"--disable-blink-features=AutomationControlled",
-				"--start-maximized",
-			],
+			// This flag hides the "I am a robot" signal from Calendly
+			args: ["--disable-blink-features=AutomationControlled"],
+			// This hides the "Chrome is controlled by automated software" bar
 			ignoreDefaultArgs: ["--enable-automation"],
 		},
-
-		// Match browser window size to view
-		viewport: null,
 	},
 
 	expect: {
@@ -43,14 +35,5 @@ module.exports = defineConfig({
 		},
 	},
 
-	projects: [
-		{
-			name: "Desktop Chrome",
-			use: {
-				...devices["Desktop Chrome"],
-				// Ensure viewport matches window for consistent screenshots
-				viewport: { width: 1920, height: 1080 },
-			},
-		},
-	],
+	projects: [{ name: "Desktop Chrome", use: { ...devices["Desktop Chrome"] } }],
 });

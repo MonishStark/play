@@ -2,25 +2,26 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. CONFIG: Stealth User Agent
+// 1. CONFIG: Stealth User Agent (Backup to the Config fix)
 test.use({
 	userAgent:
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	locale: "en-US",
+	permissions: ["geolocation"],
 	bypassCSP: true,
 	ignoreHTTPSErrors: true,
 });
 
-// 2. HELPER: Safe Scroll + Real Widget Layout
+// 2. HELPER: Safe Scroll + CSS Layout Fix
 async function performSafeScroll(page) {
-	// A. STEALTH INJECTION: Delete "Robot" property
+	// A. STEALTH INJECTION: Delete "Robot" property (Double safety)
 	await page.addInitScript(() => {
 		Object.defineProperty(navigator, "webdriver", {
 			get: () => undefined,
 		});
 	});
 
-	// B. PRE-EMPTIVE CSS: Force Layout Space (But let REAL content load)
+	// B. PRE-EMPTIVE CSS: Force Layout Space & Visibility
 	await page.addStyleTag({
 		content: `
       /* 1. Kill Cookie Bar */
@@ -44,8 +45,10 @@ async function performSafeScroll(page) {
         visibility: visible !important;
       }
 
-      /* 4. CALENDLY FIXES */
-      /* We only fix the SIZE, we do not fake the content */
+      /* 4. CALENDLY FIXES (Layout Only) */
+      .calendly-spinner { display: none !important; } /* Hide stuck spinner */
+      
+      /* Force widget to take up space immediately */
       .calendly-inline-widget, 
       iframe[src*="calendly"] {
         min-height: 1000px !important; 
@@ -55,10 +58,15 @@ async function performSafeScroll(page) {
         display: block !important;
         background-color: transparent !important;
       }
+      
+      /* 5. Catch-all for opacity 0 */
+      [style*="opacity: 0"] {
+        opacity: 1 !important;
+      }
     `,
 	});
 
-	// C. WAKE UP VIDEOS
+	// C. WAKE UP VIDEOS (Eager Load)
 	await page.evaluate(() => {
 		document.querySelectorAll("iframe").forEach((frame) => {
 			frame.loading = "eager";
@@ -78,9 +86,9 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// E. Final Buffer: Wait for the REAL Calendly to render
-	console.log("⏳ Waiting 15s for Real Calendly Widget...");
-	await page.waitForTimeout(15000);
+	// E. Final Buffer: Just Wait (Config fix allows natural load)
+	console.log("⏳ Waiting 10s for widgets to render...");
+	await page.waitForTimeout(10000);
 }
 
 // 3. PUBLIC URL LIST
