@@ -2,14 +2,14 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Safe Scroll + Force Reveal (Fixes Missing Sections & Black Videos)
+// 1. HELPER: Safe Scroll + Universal Visibility (Fixes Missing Sections & Black Videos)
 async function performSafeScroll(page) {
 	// A. Hide Cookie Bar
 	await page.addStyleTag({
 		content: "#moove_gdpr_cookie_info_bar { display: none !important; }",
 	});
 
-	// B. Scroll logic to trigger standard lazy loading
+	// B. Scroll logic (Trigger standard lazy loading)
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
@@ -23,8 +23,8 @@ async function performSafeScroll(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// C. FORCE REVEAL: The "Nuclear Option" for missing content
-	// This finds ANY element hidden by animation (Elementor, AOS, etc.) and forces it to show.
+	// C. UNIVERSAL VISIBILITY FIX (The "Sledgehammer")
+	// Instead of guessing class names, we force ALL hidden content to appear.
 	await page.evaluate(() => {
 		// 1. Force Iframes (Videos) to load
 		document.querySelectorAll("iframe").forEach((frame) => {
@@ -32,28 +32,26 @@ async function performSafeScroll(page) {
 			frame.style.opacity = "1";
 		});
 
-		// 2. Force "Fade In" elements to show immediately
-		// Checks for common animation libraries (Elementor, AOS, WOW.js)
-		const hiddenSelectors = [
-			".elementor-invisible",
-			"[data-aos]",
-			".wow",
-			".animated",
-			'[style*="opacity: 0"]',
-		];
-
-		hiddenSelectors.forEach((selector) => {
-			document.querySelectorAll(selector).forEach((el) => {
-				el.classList.remove("elementor-invisible"); // Remove hiding class
-				el.style.opacity = "1"; // Force opaque
-				el.style.visibility = "visible"; // Force visible
+		// 2. Find ANY element with opacity 0 and force it to 1
+		const allElements = document.querySelectorAll("*");
+		allElements.forEach((el) => {
+			const style = window.getComputedStyle(el);
+			// Check if element is effectively hidden
+			if (style.opacity === "0" || style.visibility === "hidden") {
+				el.style.opacity = "1";
+				el.style.visibility = "visible";
 				el.style.animation = "none"; // Stop moving
 				el.style.transition = "none"; // Stop fading
-			});
+			}
+
+			// Also remove common hiding classes just in case
+			if (el.classList.contains("elementor-invisible")) {
+				el.classList.remove("elementor-invisible");
+			}
 		});
 	});
 
-	// D. Final Buffer: 5 Seconds for the "forced" layout to settle and videos to paint
+	// D. Final Buffer: 5 Seconds for the forced content to paint
 	console.log("⏳ Waiting 5s for forced layout to settle...");
 	await page.waitForTimeout(5000);
 }
@@ -82,7 +80,7 @@ test.describe("I Got Mind - Public Visual Audit", () => {
 			// Fast initial wait for text/layout
 			await page.waitForLoadState("domcontentloaded");
 
-			// Run Safe Scroll with Force Reveal
+			// Run Safe Scroll with Universal Visibility Fix
 			await performSafeScroll(page);
 
 			await expect(page).toHaveScreenshot({ fullPage: true });
