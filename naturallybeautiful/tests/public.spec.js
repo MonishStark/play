@@ -2,48 +2,50 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Slow Scroll + Popup Killer
+// 1. HELPER: Popup Killer + Safe Scroll
 async function loadAllLazyImages(page) {
 	// A. INJECT CSS: The "Anti-Popup" Shield
-	// This specifically targets the "Subscribe" popup seen in your screenshots
 	await page.addStyleTag({
 		content: `
-            /* 1. Hide Popup Maker & Elementor Popups */
+            /* 1. Hide Common WordPress Popups (Popup Maker, Elementor, etc) */
             .pum, .pum-overlay, .pum-container, .popmake { display: none !important; opacity: 0 !important; }
             .elementor-popup-modal, .dialog-widget { display: none !important; }
-
-            /* 2. Hide Generic "Subscribe" Modals */
+            
+            /* 2. Hide Generic "Subscribe" Modals by ID/Class */
             div[class*="popup"], div[id*="popup"] { display: none !important; }
             div[class*="subscribe"], div[id*="subscribe"] { display: none !important; }
             div[class*="newsletter"], div[id*="newsletter"] { display: none !important; }
             div[aria-modal="true"] { display: none !important; }
 
-            /* 3. Unlock Scrolling (Crucial if popup locks the body) */
+            /* 3. UNLOCK SCROLLING (Crucial for iPhone) */
             html, body { 
                 overflow: visible !important; 
                 overflow-y: auto !important;
                 height: auto !important;
+                position: static !important;
             }
         `,
 	});
 
-	// B. Wait for fonts
+	// B. Wait for fonts to load
 	await page.evaluate(async () => {
 		await document.fonts.ready;
 	});
 
-	// C. Slow Scroll (Human-like) to trigger lazy loading
+	// C. Scroll to trigger lazy loading
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		for (let i = 0; i < totalHeight; i += 100) {
+		// Fast scroll (150px steps) - fast enough for speed, slow enough for images
+		for (let i = 0; i < totalHeight; i += 150) {
 			window.scrollTo(0, i);
-			await delay(100);
+			await delay(50);
 		}
 		window.scrollTo(0, 0);
 	});
 
+	// D. Safety Buffer (Fixed wait is safer than networkidle here)
 	await page.waitForTimeout(2000);
 }
 
@@ -112,19 +114,18 @@ const pagesToTest = [
 test.describe("Naturally Beautiful - Full Site Audit", () => {
 	for (const pageInfo of pagesToTest) {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
-			// 1. Navigate
-			await page.goto(pageInfo.path);
+			console.log(`➡️ Processing: ${pageInfo.name}`);
 
-			// 2. Wait for Network to Settle
-			await page.waitForLoadState("networkidle");
+			// 1. NAVIGATE: Use "domcontentloaded" (Faster, doesn't get stuck)
+			await page.goto(pageInfo.path, { waitUntil: "domcontentloaded" });
 
-			// 3. Prepare Page (Hide Popups + Scroll)
+			// 2. PREPARE: Run the helper (CSS Inject + Scroll + Buffer Wait)
 			await loadAllLazyImages(page);
 
-			// 4. Take Screenshot (Clean, no masking needed)
+			// 3. SNAPSHOT
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
-				timeout: 60000,
+				timeout: 30000,
 				maxDiffPixelRatio: 0.02,
 				animations: "disabled",
 			});
