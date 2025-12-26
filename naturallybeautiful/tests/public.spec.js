@@ -2,16 +2,41 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Slow/Safe Scroller (Prevents Bot Blocking & Loads Images)
+// 1. HELPER: Slow Scroll + Popup Killer
 async function loadAllLazyImages(page) {
-	// Wait for fonts/icons
-	await page.evaluate(() => document.fonts.ready);
+	// A. INJECT CSS: The "Anti-Popup" Shield
+	// This specifically targets the "Subscribe" popup seen in your screenshots
+	await page.addStyleTag({
+		content: `
+            /* 1. Hide Popup Maker & Elementor Popups */
+            .pum, .pum-overlay, .pum-container, .popmake { display: none !important; opacity: 0 !important; }
+            .elementor-popup-modal, .dialog-widget { display: none !important; }
 
+            /* 2. Hide Generic "Subscribe" Modals */
+            div[class*="popup"], div[id*="popup"] { display: none !important; }
+            div[class*="subscribe"], div[id*="subscribe"] { display: none !important; }
+            div[class*="newsletter"], div[id*="newsletter"] { display: none !important; }
+            div[aria-modal="true"] { display: none !important; }
+
+            /* 3. Unlock Scrolling (Crucial if popup locks the body) */
+            html, body { 
+                overflow: visible !important; 
+                overflow-y: auto !important;
+                height: auto !important;
+            }
+        `,
+	});
+
+	// B. Wait for fonts
+	await page.evaluate(async () => {
+		await document.fonts.ready;
+	});
+
+	// C. Slow Scroll (Human-like) to trigger lazy loading
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// Slower scroll (100px) acts more human-like
 		for (let i = 0; i < totalHeight; i += 100) {
 			window.scrollTo(0, i);
 			await delay(100);
@@ -87,18 +112,21 @@ const pagesToTest = [
 test.describe("Naturally Beautiful - Full Site Audit", () => {
 	for (const pageInfo of pagesToTest) {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
+			// 1. Navigate
 			await page.goto(pageInfo.path);
 
-			// 🔴 USE THIS: Wait for network idle (more reliable)
+			// 2. Wait for Network to Settle
 			await page.waitForLoadState("networkidle");
 
-			// 🔴 USE THIS: Slower scroll
+			// 3. Prepare Page (Hide Popups + Scroll)
 			await loadAllLazyImages(page);
 
+			// 4. Take Screenshot (Clean, no masking needed)
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
 				timeout: 60000,
 				maxDiffPixelRatio: 0.02,
+				animations: "disabled",
 			});
 		});
 	}
