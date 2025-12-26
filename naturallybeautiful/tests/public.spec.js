@@ -2,36 +2,40 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Popup Killer + Safe Scroll
+// 1. HELPER: Popup Killer + Content Stabilizer
 async function loadAllLazyImages(page) {
-	// A. INJECT CSS: The "Anti-Popup" Shield
-	// Updated with the specific classes found in your HTML inspection
+	// A. INJECT CSS: The "Anti-Popup" & "Visibility" Shield
 	await page.addStyleTag({
 		content: `
-            /* 1. TARGETED FIX: Hide "Popup Builder" Plugin (The specific one on your site) */
+            /* 1. VISIBILITY FIX: Force Elementor Content to Show */
+            /* Elementor hides elements to animate them in. We must force them visible. */
+            .elementor-invisible, 
+            .elementor-motion-effects-element, 
+            .elementor-motion-effects-parent,
+            .elementor-section, 
+            .elementor-column, 
+            .elementor-widget {
+                opacity: 1 !important;
+                visibility: visible !important;
+                animation: none !important;
+                transition: none !important;
+            }
+
+            /* 2. KILL POPUPS: Popup Builder & Others */
             #sgpb-popup-dialog-main-div, 
             .sgpb-popup-dialog-main-div-theme-wrapper-6,
             .sg-popup-content,
-            .sgpb-content { 
+            .sgpb-content,
+            .pum, .popmake, 
+            .elementor-popup-modal, 
+            div[class*="popup"], div[id*="popup"] { 
                 display: none !important; 
                 opacity: 0 !important; 
                 visibility: hidden !important;
                 pointer-events: none !important;
             }
 
-            /* 2. Hide ActiveCampaign Forms (The form inside the popup) */
-            ._form_5, form[action*="activehosted"] { display: none !important; }
-
-            /* 3. Hide Other Common WordPress Popups (Popup Maker, Elementor) */
-            .pum, .pum-overlay, .pum-container, .popmake { display: none !important; }
-            .elementor-popup-modal, .dialog-widget { display: none !important; }
-            
-            /* 4. Hide Generic Modals by keywords */
-            div[class*="popup"], div[id*="popup"] { display: none !important; }
-            div[class*="subscribe"], div[id*="subscribe"] { display: none !important; }
-            div[aria-modal="true"] { display: none !important; }
-
-            /* 5. UNLOCK SCROLLING (Crucial for iPhone) */
+            /* 3. UNLOCK SCROLLING (Fixes iPhone "Stuck" issues) */
             html, body { 
                 overflow: visible !important; 
                 overflow-y: auto !important;
@@ -41,17 +45,16 @@ async function loadAllLazyImages(page) {
         `,
 	});
 
-	// B. Wait for fonts to load
+	// B. Wait for fonts (Prevents text layout shifts)
 	await page.evaluate(async () => {
 		await document.fonts.ready;
 	});
 
-	// C. Scroll to trigger lazy loading
+	// C. Slow Scroll to trigger all lazy-loaded images
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// Fast scroll (150px steps)
 		for (let i = 0; i < totalHeight; i += 150) {
 			window.scrollTo(0, i);
 			await delay(50);
@@ -59,8 +62,8 @@ async function loadAllLazyImages(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// D. Safety Buffer
-	await page.waitForTimeout(2000);
+	// D. Final Safety Buffer
+	await page.waitForTimeout(3000);
 }
 
 const pagesToTest = [
@@ -130,18 +133,18 @@ test.describe("Naturally Beautiful - Full Site Audit", () => {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
 			console.log(`➡️ Processing: ${pageInfo.name}`);
 
-			// 1. NAVIGATE
+			// 1. Navigate
 			await page.goto(pageInfo.path, { waitUntil: "domcontentloaded" });
 
-			// 2. PREPARE: Kill Popups & Scroll
+			// 2. Prepare (Hide Popups + Force Visibility + Scroll)
 			await loadAllLazyImages(page);
 
-			// 3. SNAPSHOT
+			// 3. Screenshot
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
 				timeout: 30000,
 				maxDiffPixelRatio: 0.02,
-				animations: "disabled",
+				animations: "disabled", // This keeps screenshots consistent
 			});
 		});
 	}
