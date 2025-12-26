@@ -5,19 +5,33 @@ const { test, expect } = require("@playwright/test");
 // 1. HELPER: Popup Killer + Safe Scroll
 async function loadAllLazyImages(page) {
 	// A. INJECT CSS: The "Anti-Popup" Shield
+	// Updated with the specific classes found in your HTML inspection
 	await page.addStyleTag({
 		content: `
-            /* 1. Hide Common WordPress Popups (Popup Maker, Elementor, etc) */
-            .pum, .pum-overlay, .pum-container, .popmake { display: none !important; opacity: 0 !important; }
+            /* 1. TARGETED FIX: Hide "Popup Builder" Plugin (The specific one on your site) */
+            #sgpb-popup-dialog-main-div, 
+            .sgpb-popup-dialog-main-div-theme-wrapper-6,
+            .sg-popup-content,
+            .sgpb-content { 
+                display: none !important; 
+                opacity: 0 !important; 
+                visibility: hidden !important;
+                pointer-events: none !important;
+            }
+
+            /* 2. Hide ActiveCampaign Forms (The form inside the popup) */
+            ._form_5, form[action*="activehosted"] { display: none !important; }
+
+            /* 3. Hide Other Common WordPress Popups (Popup Maker, Elementor) */
+            .pum, .pum-overlay, .pum-container, .popmake { display: none !important; }
             .elementor-popup-modal, .dialog-widget { display: none !important; }
             
-            /* 2. Hide Generic "Subscribe" Modals by ID/Class */
+            /* 4. Hide Generic Modals by keywords */
             div[class*="popup"], div[id*="popup"] { display: none !important; }
             div[class*="subscribe"], div[id*="subscribe"] { display: none !important; }
-            div[class*="newsletter"], div[id*="newsletter"] { display: none !important; }
             div[aria-modal="true"] { display: none !important; }
 
-            /* 3. UNLOCK SCROLLING (Crucial for iPhone) */
+            /* 5. UNLOCK SCROLLING (Crucial for iPhone) */
             html, body { 
                 overflow: visible !important; 
                 overflow-y: auto !important;
@@ -37,7 +51,7 @@ async function loadAllLazyImages(page) {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		// Fast scroll (150px steps) - fast enough for speed, slow enough for images
+		// Fast scroll (150px steps)
 		for (let i = 0; i < totalHeight; i += 150) {
 			window.scrollTo(0, i);
 			await delay(50);
@@ -45,7 +59,7 @@ async function loadAllLazyImages(page) {
 		window.scrollTo(0, 0);
 	});
 
-	// D. Safety Buffer (Fixed wait is safer than networkidle here)
+	// D. Safety Buffer
 	await page.waitForTimeout(2000);
 }
 
@@ -116,10 +130,10 @@ test.describe("Naturally Beautiful - Full Site Audit", () => {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
 			console.log(`➡️ Processing: ${pageInfo.name}`);
 
-			// 1. NAVIGATE: Use "domcontentloaded" (Faster, doesn't get stuck)
+			// 1. NAVIGATE
 			await page.goto(pageInfo.path, { waitUntil: "domcontentloaded" });
 
-			// 2. PREPARE: Run the helper (CSS Inject + Scroll + Buffer Wait)
+			// 2. PREPARE: Kill Popups & Scroll
 			await loadAllLazyImages(page);
 
 			// 3. SNAPSHOT
