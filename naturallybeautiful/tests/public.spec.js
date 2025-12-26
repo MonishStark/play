@@ -2,48 +2,64 @@
 
 const { test, expect } = require("@playwright/test");
 
-// 1. HELPER: Slow Scroll + Popup Killer
+// 1. HELPER: Popup Killer + Safe Scroll
 async function loadAllLazyImages(page) {
 	// A. INJECT CSS: The "Anti-Popup" Shield
-	// This specifically targets the "Subscribe" popup seen in your screenshots
+	// Updated with the specific classes found in your HTML inspection
 	await page.addStyleTag({
 		content: `
-            /* 1. Hide Popup Maker & Elementor Popups */
-            .pum, .pum-overlay, .pum-container, .popmake { display: none !important; opacity: 0 !important; }
-            .elementor-popup-modal, .dialog-widget { display: none !important; }
+            /* 1. TARGETED FIX: Hide "Popup Builder" Plugin (The specific one on your site) */
+            #sgpb-popup-dialog-main-div, 
+            .sgpb-popup-dialog-main-div-theme-wrapper-6,
+            .sg-popup-content,
+            .sgpb-content { 
+                display: none !important; 
+                opacity: 0 !important; 
+                visibility: hidden !important;
+                pointer-events: none !important;
+            }
 
-            /* 2. Hide Generic "Subscribe" Modals */
+            /* 2. Hide ActiveCampaign Forms (The form inside the popup) */
+            ._form_5, form[action*="activehosted"] { display: none !important; }
+
+            /* 3. Hide Other Common WordPress Popups (Popup Maker, Elementor) */
+            .pum, .pum-overlay, .pum-container, .popmake { display: none !important; }
+            .elementor-popup-modal, .dialog-widget { display: none !important; }
+            
+            /* 4. Hide Generic Modals by keywords */
             div[class*="popup"], div[id*="popup"] { display: none !important; }
             div[class*="subscribe"], div[id*="subscribe"] { display: none !important; }
-            div[class*="newsletter"], div[id*="newsletter"] { display: none !important; }
             div[aria-modal="true"] { display: none !important; }
 
-            /* 3. Unlock Scrolling (Crucial if popup locks the body) */
+            /* 5. UNLOCK SCROLLING (Crucial for iPhone) */
             html, body { 
                 overflow: visible !important; 
                 overflow-y: auto !important;
                 height: auto !important;
+                position: static !important;
             }
         `,
 	});
 
-	// B. Wait for fonts
+	// B. Wait for fonts to load
 	await page.evaluate(async () => {
 		await document.fonts.ready;
 	});
 
-	// C. Slow Scroll (Human-like) to trigger lazy loading
+	// C. Scroll to trigger lazy loading
 	await page.evaluate(async () => {
 		const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 		const totalHeight = document.body.scrollHeight;
 
-		for (let i = 0; i < totalHeight; i += 100) {
+		// Fast scroll (150px steps)
+		for (let i = 0; i < totalHeight; i += 150) {
 			window.scrollTo(0, i);
-			await delay(100);
+			await delay(50);
 		}
 		window.scrollTo(0, 0);
 	});
 
+	// D. Safety Buffer
 	await page.waitForTimeout(2000);
 }
 
@@ -112,19 +128,18 @@ const pagesToTest = [
 test.describe("Naturally Beautiful - Full Site Audit", () => {
 	for (const pageInfo of pagesToTest) {
 		test(`Verify Layout: ${pageInfo.name}`, async ({ page }) => {
-			// 1. Navigate
-			await page.goto(pageInfo.path);
+			console.log(`➡️ Processing: ${pageInfo.name}`);
 
-			// 2. Wait for Network to Settle
-			await page.waitForLoadState("networkidle");
+			// 1. NAVIGATE
+			await page.goto(pageInfo.path, { waitUntil: "domcontentloaded" });
 
-			// 3. Prepare Page (Hide Popups + Scroll)
+			// 2. PREPARE: Kill Popups & Scroll
 			await loadAllLazyImages(page);
 
-			// 4. Take Screenshot (Clean, no masking needed)
+			// 3. SNAPSHOT
 			await expect(page).toHaveScreenshot({
 				fullPage: true,
-				timeout: 60000,
+				timeout: 30000,
 				maxDiffPixelRatio: 0.02,
 				animations: "disabled",
 			});
