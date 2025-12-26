@@ -51,7 +51,7 @@ async function preparePageForScreenshot(page) {
 		window.scrollTo(0, 0);
 	});
 
-	await page.waitForTimeout(3000);
+	await page.waitForLoadState("networkidle");
 }
 
 const pagesToTest = [
